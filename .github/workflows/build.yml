@@ -1,10 +1,8 @@
-name: Java CI with Maven
+name: Build Minecraft Plugin
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master" ] # Сборка сработает при пуше в эти ветки
 
 jobs:
   build:
@@ -22,10 +20,11 @@ jobs:
         cache: maven
 
     - name: Build with Maven
+      # Флаг --file pom.xml гарантирует, что Maven найдет конфиг в корне
       run: mvn -B package --file pom.xml
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CreateCountry-Plugin
+        name: CreateCountry-Jar-File
         path: target/*.jar
