@@ -1,0 +1,10 @@
+name: CreateCountry
+version: 1.0
+main: me.states.CreateCountry
+api-version: '1.21'
+depend: [Vault]
+commands:
+  create:
+    description: Создать страну
+  state:
+    description: Управление страной
