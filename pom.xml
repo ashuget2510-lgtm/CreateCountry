@@ -16,17 +16,12 @@
     </properties>
 
     <repositories>
-        <!-- PaperMC Repository -->
+        <!-- PaperMC Repo -->
         <repository>
             <id>papermc</id>
-            <url>https://repo.papermc.io/repository/maven-public/</url>
+            <url>https://papermc.io</url>
         </repository>
-        <!-- SpigotMC Repository -->
-        <repository>
-            <id>spigot-repo</id>
-            <url>https://spigotmc.org</url>
-        </repository>
-        <!-- JitPack for Vault -->
+        <!-- JitPack для Vault -->
         <repository>
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
@@ -34,11 +29,11 @@
     </repositories>
 
     <dependencies>
-        <!-- Paper API 1.21.1 -->
+        <!-- Paper API для версии 1.21 -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.1-R0.1-SNAPSHOT</version>
+            <version>1.21-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <!-- Vault API -->
