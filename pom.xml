@@ -12,8 +12,8 @@
     </properties>
     <repositories>
         <repository>
-            <id>papermc</id>
-            <url>https://papermc.io</url>
+            <id>spigot-repo</id>
+            <url>https://spigotmc.org</url>
         </repository>
         <repository>
             <id>jitpack.io</id>
@@ -22,9 +22,9 @@
     </repositories>
     <dependencies>
         <dependency>
-            <groupId>io.papermc.paper</groupId>
-            <artifactId>paper-api</artifactId>
-            <version>1.20.4-R0.1-SNAPSHOT</version>
+            <groupId>org.bukkit</groupId>
+            <artifactId>bukkit</artifactId>
+            <version>1.13.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
