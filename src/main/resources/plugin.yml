@@ -1,10 +1,6 @@
 name: CreateCountry
 version: 1.0
-main: me.states.CreateCountry
-api-version: '1.21'
-depend: [Vault]
-commands:
-  create:
-    description: Создать страну
-  state:
-    description: Управление страной
+main: com.yourname.CreateCountry # УКАЖИ ТУТ СВОЙ ПУТЬ К КЛАССУ
+api-version: "1.21"
+depend: [Vault] # Если плагин не работает без Vault
+description: Плагин на страны для сервера 1.21.
