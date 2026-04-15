@@ -10,20 +10,24 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
     </properties>
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
     <dependencies>
         <dependency>
-            <groupId>io.papermc.paper</groupId>
-            <artifactId>paper-api</artifactId>
+            <groupId>com.github.PaperMC</groupId>
+            <artifactId>Paper</artifactId>
             <version>1.21.1</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/api.jar</systemPath>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.github.MilkBowl</groupId>
             <artifactId>VaultAPI</artifactId>
             <version>1.7</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/vault.jar</systemPath>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
     <build>
