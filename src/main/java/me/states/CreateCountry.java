@@ -11,8 +11,9 @@ import net.milkbowl.vault.economy.Economy;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
-public class CreateCountry extends JavaPlugin implements Listener, CommandExecutor {
+public class CreateCountry extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
 
     private Connection db;
     private Economy econ = null;
@@ -22,14 +23,20 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
     @Override
     public void onEnable() {
         if (!setupEconomy()) {
-            getLogger().severe("Vault не найден!");
+            getLogger().severe("Vault не найден! Экономика отключена.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         setupDatabase();
+        
+        // Регистрация команд
         getCommand("create").setExecutor(this);
+        getCommand("create").setTabCompleter(this);
         getCommand("state").setExecutor(this);
+        getCommand("state").setTabCompleter(this);
+        
         getServer().getPluginManager().registerEvents(this, this);
+        getLogger().info("Плагин на страны успешно запущен!");
     }
 
     private boolean setupEconomy() {
@@ -51,33 +58,83 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (!(sender instanceof Player)) return true;
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Команды только для игроков!");
+            return true;
+        }
         Player p = (Player) sender;
 
-        if (cmd.getName().equalsIgnoreCase("create") && args.length >= 5) {
-            String name = args[1];
+        // Команда /create <название> <R> <G> <B>
+        if (cmd.getName().equalsIgnoreCase("create")) {
+            if (args.length < 4) {
+                p.sendMessage("§e[!] Использование: §f/create <название> <R> <G> <B>");
+                p.sendMessage("§7Пример: /create Russia 255 0 0");
+                return true;
+            }
+            String name = args[0];
             try {
-                Color col = Color.fromRGB(Integer.parseInt(args[2]), Integer.parseInt(args[3]), Integer.parseInt(args[4]));
+                int r = Integer.parseInt(args[1]);
+                int g = Integer.parseInt(args[2]);
+                int b = Integer.parseInt(args[3]);
+                Color col = Color.fromRGB(r, g, b);
+                
                 if (econ.withdrawPlayer(p, 10000).transactionSuccess()) {
                     saveState(name, p.getUniqueId().toString(), col);
-                    stateColors.put(name, col);
-                    p.sendMessage("§aСтрана создана!");
-                } else p.sendMessage("§cМало денег ($10,000)!");
-            } catch (Exception e) { p.sendMessage("§cОшибка RGB!"); }
+                    p.sendMessage("§a[✔] Страна §l" + name + " §aуспешно создана!");
+                } else {
+                    p.sendMessage("§c[✘] Недостаточно средств! Нужно §6$10,000");
+                }
+            } catch (Exception e) {
+                p.sendMessage("§c[!] Ошибка в цвете RGB (0-255)!");
+            }
             return true;
         }
         
-        if (cmd.getName().equalsIgnoreCase("state") && args.length > 0 && args[0].equalsIgnoreCase("claim")) {
-            String state = getPlayerState(p);
-            if (state != null && econ.withdrawPlayer(p, 500).transactionSuccess()) {
-                Chunk c = p.getLocation().getChunk();
-                claims.put(c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ(), state);
-                saveClaim(c, state);
-                p.sendMessage("§aЧанк захвачен!");
-            } else p.sendMessage("§cОшибка захвата!");
-            return true;
+        // Команда /state
+        if (cmd.getName().equalsIgnoreCase("state")) {
+            if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+                p.sendMessage("§b--- [ Помощь по Странам ] ---");
+                p.sendMessage("§f/state claim §7- Захватить чанк ($500)");
+                p.sendMessage("§f/state info §7- Узнать владельца чанка");
+                p.sendMessage("§f/create <имя> <r> <g> <b> §7- Создать страну");
+                return true;
+            }
+
+            if (args[0].equalsIgnoreCase("claim")) {
+                String state = getPlayerState(p);
+                if (state == null) {
+                    p.sendMessage("§c[!] Вы не являетесь лидером страны!");
+                    return true;
+                }
+                if (econ.withdrawPlayer(p, 500).transactionSuccess()) {
+                    Chunk c = p.getLocation().getChunk();
+                    claims.put(c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ(), state);
+                    saveClaim(c, state);
+                    p.sendMessage("§a[✔] Чанк теперь принадлежит стране §l" + state);
+                } else {
+                    p.sendMessage("§c[✘] Мало денег! Захват стоит §6$500");
+                }
+                return true;
+            }
         }
         return true;
+    }
+
+    // ТАБ-КОМПЛИТЕР (Подсказки)
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+        if (cmd.getName().equalsIgnoreCase("state")) {
+            if (args.length == 1) {
+                return Arrays.asList("claim", "help", "info").stream()
+                        .filter(s -> s.startsWith(args[0].toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+        }
+        if (cmd.getName().equalsIgnoreCase("create")) {
+            if (args.length == 1) return Collections.singletonList("<Название>");
+            if (args.length == 2) return Collections.singletonList("255"); // Подсказка для R
+        }
+        return null;
     }
 
     @EventHandler public void onBreak(BlockBreakEvent e) { check(e, e.getBlock().getChunk()); }
@@ -87,7 +144,11 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
         String key = c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ();
         if (claims.containsKey(key)) {
             String owner = claims.get(key);
-            if (!owner.equals(getPlayerState((Player) e))) e.setCancelled(true);
+            Player p = (e instanceof BlockBreakEvent) ? ((BlockBreakEvent)e).getPlayer() : ((BlockPlaceEvent)e).getPlayer();
+            if (!owner.equals(getPlayerState(p))) {
+                e.setCancelled(true);
+                p.sendMessage("§c[!] Эта территория принадлежит стране §l" + owner);
+            }
         }
     }
 
