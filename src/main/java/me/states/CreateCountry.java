@@ -31,7 +31,7 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
         getCommand("state").setTabCompleter(this);
         
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("CreateCountry включен!");
+        getLogger().info(">>> Плагин на Страны ЗАПУЩЕН! <<<");
     }
 
     private void setupEconomy() {
@@ -62,79 +62,90 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (cmd.getName().equalsIgnoreCase("create") && sender instanceof Player) {
-            Player p = (Player) sender;
-            if (args.length < 4) {
-                p.sendMessage("§6[!] §fИспользуй: /create <имя> <R> <G> <B>");
+        if (!(sender instanceof Player)) return true;
+        Player p = (Player) sender;
+
+        if (cmd.getName().equalsIgnoreCase("create")) {
+            if (args.length < 1) {
+                p.sendMessage("§e[!] Используй: /create <название> [R G B]");
                 return true;
             }
+            
+            String name = args[0];
+            int r = 255, g = 255, b = 255;
+            
+            if (args.length >= 4) {
+                try {
+                    r = Integer.parseInt(args[1]);
+                    g = Integer.parseInt(args[2]);
+                    b = Integer.parseInt(args[3]);
+                } catch (NumberFormatException e) {
+                    p.sendMessage("§c[!] RGB должны быть числами. Использую белый цвет.");
+                }
+            }
+
+            if (econ != null && !econ.has(p, 10000)) {
+                p.sendMessage("§c[✘] У вас нет $10,000 для создания страны!");
+                return true;
+            }
+
             try {
-                String name = args[0];
-                int r = Integer.parseInt(args[1]);
-                int g = Integer.parseInt(args[2]);
-                int b = Integer.parseInt(args[3]);
-                if (econ != null && econ.withdrawPlayer(p, 10000).transactionSuccess()) {
-                    saveState(name, p.getUniqueId().toString(), Color.fromRGB(r, g, b));
-                    p.sendMessage("§a[✔] Страна §l" + name + " §aсоздана!");
-                } else p.sendMessage("§c[✘] Нужно $10,000!");
-            } catch (Exception e) { p.sendMessage("§c[!] Ошибка в числах RGB!"); }
+                if (econ != null) econ.withdrawPlayer(p, 10000);
+                saveState(name, p.getUniqueId().toString(), Color.fromRGB(r, g, b));
+                p.sendMessage("§a[✔] Страна §l" + name + " §aуспешно создана!");
+                p.sendMessage("§7Цвет RGB: " + r + ", " + g + ", " + b);
+            } catch (SQLException e) {
+                p.sendMessage("§c[!] Ошибка БД: Такое название уже занято!");
+            }
             return true;
         }
 
         if (cmd.getName().equalsIgnoreCase("state")) {
-            if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
-                if (!sender.hasPermission("state.admin")) {
-                    sender.sendMessage("§cНет прав!");
+            if (args.length > 0 && args[0].equalsIgnoreCase("claim")) {
+                String state = getPlayerState(p);
+                if (state == null) {
+                    p.sendMessage("§c[!] Вы не лидер страны! Создайте её: /create <имя>");
                     return true;
                 }
-                sender.sendMessage("§e[↻] Перезагрузка плагина CreateCountry...");
-                loadClaims();
-                sender.sendMessage("§a[✔] Плагин успешно перезагружен!");
-                return true;
-            }
-            
-            if (sender instanceof Player && args.length > 0 && args[0].equalsIgnoreCase("claim")) {
-                Player p = (Player) sender;
-                String state = getPlayerState(p);
-                if (state != null && econ != null && econ.withdrawPlayer(p, 500).transactionSuccess()) {
+                if (econ != null && econ.withdrawPlayer(p, 500).transactionSuccess()) {
                     Chunk c = p.getLocation().getChunk();
-                    claims.put(c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ(), state);
+                    String key = c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ();
+                    claims.put(key, state);
                     saveClaim(c, state);
-                    p.sendMessage("§a[✔] Чанк захвачен!");
-                } else p.sendMessage("§c[✘] Ошибка (вы не лидер или нет денег)");
+                    p.sendMessage("§a[✔] Чанк теперь под защитой страны §l" + state);
+                } else p.sendMessage("§c[✘] Нужно $500!");
                 return true;
             }
-            sender.sendMessage("§b--- [ Страны ] ---\n§f/state claim §7- Захват\n§f/state reload §7- Админ-релоад");
+            p.sendMessage("§b--- [ Система Стран ] ---");
+            p.sendMessage("§f/create <имя> §7- Создать ($10k)");
+            p.sendMessage("§f/state claim §7- Захват чанка ($500)");
         }
         return true;
     }
 
-    // ТЕ САМЫЕ ПОДСКАЗКИ (TAB COMPLETE)
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (cmd.getName().equalsIgnoreCase("state")) {
-            if (args.length == 1) return filter(Arrays.asList("claim", "reload", "help"), args[0]);
+            if (args.length == 1) return Arrays.asList("claim", "help").stream()
+                .filter(s -> s.startsWith(args[0].toLowerCase())).collect(Collectors.toList());
         }
         if (cmd.getName().equalsIgnoreCase("create")) {
-            if (args.length == 1) return Collections.singletonList("<Название>");
-            if (args.length == 2) return Arrays.asList("255", "0");
-            if (args.length == 3) return Arrays.asList("255", "0");
-            if (args.length == 4) return Arrays.asList("255", "0");
+            if (args.length == 1) return Collections.singletonList("Название_Страны");
+            if (args.length >= 2 && args.length <= 4) return Collections.singletonList("255");
         }
         return Collections.emptyList();
     }
 
-    private List<String> filter(List<String> list, String arg) {
-        return list.stream().filter(s -> s.toLowerCase().startsWith(arg.toLowerCase())).collect(Collectors.toList());
-    }
-
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBreak(BlockBreakEvent e) {
         Chunk c = e.getBlock().getChunk();
         String key = c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ();
-        if (claims.containsKey(key) && !claims.get(key).equals(getPlayerState(e.getPlayer()))) {
-            e.setCancelled(true);
-            e.getPlayer().sendMessage("§c[!] Территория страны §l" + claims.get(key));
+        if (claims.containsKey(key)) {
+            String owner = claims.get(key);
+            if (!owner.equals(getPlayerState(e.getPlayer()))) {
+                e.setCancelled(true);
+                e.getPlayer().sendMessage("§c[!] Это территория страны §l" + owner);
+            }
         }
     }
 
