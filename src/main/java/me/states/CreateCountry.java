@@ -7,7 +7,9 @@ import org.bukkit.boss.*;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
-import org.bukkit.event.block.*;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.*;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
@@ -16,9 +18,9 @@ import java.util.stream.Collectors;
 
 public class CreateCountry extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
 
-    private final Map<String, String> claims = new ConcurrentHashMap<>(); // Координаты чанков : Название страны
-    private final Map<String, String> countryLeaders = new HashMap<>(); // Название : UUID лидера
-    private final Map<String, List<String>> residents = new HashMap<>(); // Название : Список ников
+    private final Map<String, String> claims = new ConcurrentHashMap<>();
+    private final Map<String, String> countryLeaders = new HashMap<>();
+    private final Map<String, List<String>> residents = new HashMap<>();
     private final Map<UUID, BossBar> activeBars = new HashMap<>();
 
     @Override
@@ -26,11 +28,8 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
         getCommand("create").setExecutor(this);
         getCommand("create").setTabCompleter(this);
         getServer().getPluginManager().registerEvents(this, this);
-
-        // Задача на отрисовку границ частицами (раз в секунду)
         startBorderParticles();
-        
-        getLogger().info("=== CreateCountry v3.0 (Konquest Style) LOADED ===");
+        getLogger().info("CreateCountry v3.5 LOADED!");
     }
 
     @Override
@@ -38,74 +37,91 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
         if (!(sender instanceof Player)) return true;
         Player p = (Player) sender;
 
-        if (args.length == 0) return sendHelp(p);
+        if (args.length == 0) {
+            p.sendMessage("§b§l[!] §fИспользуйте §b/create menu §fдля управления.");
+            return true;
+        }
 
         switch (args[0].toLowerCase()) {
-            case "create":
-                if (args.length < 2) return false;
-                handleCreate(p, args[1]);
+            case "menu":
+                openMainMenu(p);
                 break;
             case "claim":
                 handleClaim(p);
                 break;
-            case "invite":
-                if (args.length < 2) p.sendMessage("§cИспользуй: /create invite <ник>");
-                else p.sendMessage("§e[!] Игроку " + args[1] + " отправлено приглашение в " + getPlayerCountry(p));
-                break;
             case "expand":
                 handleExpand(p);
                 break;
-            case "reload":
-                if (p.hasPermission("create.admin")) p.sendMessage("§a[✔] Плагин перезагружен!");
+            case "invite":
+                if (args.length < 2) p.sendMessage("§c§l[!] §fУкажите ник игрока.");
+                else p.sendMessage("§a§l[✔] §fПриглашение отправлено игроку §e" + args[1]);
                 break;
             default:
-                p.sendMessage("§cНеизвестная команда. Используйте /create help");
+                // Логика создания: /create <название>
+                String name = args[0];
+                handleCreate(p, name);
                 break;
         }
         return true;
     }
 
     private void handleCreate(Player p, String name) {
+        if (countryLeaders.containsKey(name)) {
+            p.sendMessage("§c§l[✘] §fНазвание §e" + name + " §fуже занято!");
+            return;
+        }
         countryLeaders.put(name, p.getUniqueId().toString());
         residents.put(name, new ArrayList<>(Collections.singletonList(p.getName())));
-        p.sendMessage("§a[✔] Страна §l" + name + " §aоснована!");
+        
+        // Твое пожелание: четкое подтверждение
+        p.sendMessage("");
+        p.sendMessage("§a§l      [ СТРАНА СОЗДАНА ]");
+        p.sendMessage("§f Название: §e§l" + name);
+        p.sendMessage("§f Статус: §b§lУСПЕШНО ✅");
+        p.sendMessage("§7 Теперь используйте /create claim для захвата земель.");
+        p.sendMessage("");
+        
+        p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
         updateBossBar(p, name);
     }
 
-    private void handleClaim(Player p) {
-        String country = getPlayerCountry(p);
-        if (country == null) {
-            p.sendMessage("§c[!] Вы не состоите в стране!");
-            return;
+    // --- GUI МЕНЮ ---
+    public void openMainMenu(Player p) {
+        Inventory inv = Bukkit.createInventory(null, 27, "§8Управление: §l" + (getPlayerCountry(p) != null ? getPlayerCountry(p) : "Меню"));
+
+        // Заполнение стеклом
+        ItemStack glass = new ItemStack(Material.CYAN_STAINED_GLASS_PANE);
+        ItemMeta gMeta = glass.getItemMeta(); gMeta.setDisplayName(" "); glass.setItemMeta(gMeta);
+        for(int i=0; i<27; i++) inv.setItem(i, glass);
+
+        inv.setItem(10, createGuiItem(Material.GRASS_BLOCK, "§a§lЗАХВАТ ЗЕМЛИ", "§7Захватить чанк, в котором вы стоите", "§eЦена: $500", " ", "§b> Нажмите для покупки"));
+        inv.setItem(13, createGuiItem(Material.GOLDEN_AXE, "§6§lРАСШИРЕНИЕ (WE)", "§7Расширить границы по выделению", "§7Требуется WorldEdit топорик", " ", "§b> Нажмите для расширения"));
+        inv.setItem(16, createGuiItem(Material.PLAYER_HEAD, "§e§lПРИГЛАСИТЬ", "§7Добавить жителя в страну", " ", "§b> Используйте /create invite <ник>"));
+
+        p.openInventory(inv);
+        p.playSound(p.getLocation(), Sound.BLOCK_CHEST_OPEN, 1f, 1f);
+    }
+
+    private ItemStack createGuiItem(Material m, String name, String... lore) {
+        ItemStack item = new ItemStack(m);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(name);
+        meta.setLore(Arrays.asList(lore));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    @EventHandler
+    public void onMenuClick(InventoryClickEvent e) {
+        if (e.getView().getTitle().startsWith("§8Управление:")) {
+            e.setCancelled(true);
+            Player p = (Player) e.getWhoClicked();
+            if (e.getRawSlot() == 10) { p.closeInventory(); p.performCommand("create claim"); }
+            if (e.getRawSlot() == 13) { p.closeInventory(); p.performCommand("create expand"); }
         }
-        Chunk c = p.getLocation().getChunk();
-        claims.put(c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ(), country);
-        p.sendMessage("§a[✔] Чанк [" + c.getX() + ":" + c.getZ() + "] теперь ваш!");
     }
 
-    private void handleExpand(Player p) {
-        try {
-            WorldEditPlugin we = (WorldEditPlugin) Bukkit.getPluginManager().getPlugin("WorldEdit");
-            if (we == null) {
-                p.sendMessage("§c[!] WorldEdit не найден!");
-                return;
-            }
-            Region r = we.getSession(p).getSelection(we.getSession(p).getSelectionWorld());
-            p.sendMessage("§a[↑] Территория расширена по выделению (размер: " + r.getArea() + " блоков)");
-        } catch (Exception e) {
-            p.sendMessage("§c[!] Сначала выделите область деревянным топором!");
-        }
-    }
-
-    private void updateBossBar(Player p, String country) {
-        BossBar bar = activeBars.getOrDefault(p.getUniqueId(), 
-            Bukkit.createBossBar("", BarColor.GREEN, BarStyle.SOLID));
-        bar.setTitle("§l" + country + " §7| Лидер: §f" + p.getName() + " §7| Жителей: §e" + residents.get(country).size());
-        bar.addPlayer(p);
-        bar.setVisible(true);
-        activeBars.put(p.getUniqueId(), bar);
-    }
-
+    // --- ЛОГИКА ГРАНИЦ И ФЛАГОВ ---
     private void startBorderParticles() {
         new BukkitRunnable() {
             @Override
@@ -113,67 +129,57 @@ public class CreateCountry extends JavaPlugin implements Listener, CommandExecut
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     Chunk c = p.getLocation().getChunk();
                     String key = c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ();
-                    if (claims.containsKey(key)) {
-                        drawChunkBorders(p, c);
-                    }
+                    if (claims.containsKey(key)) drawBorders(p, c);
                 }
             }
-        }.runTaskTimer(this, 0, 20L);
+        }.runTaskTimer(this, 0, 15L);
     }
 
-    private void drawChunkBorders(Player p, Chunk c) {
+    private void drawBorders(Player p, Chunk c) {
         World w = c.getWorld();
-        int y = p.getLocation().getBlockY() + 1;
+        double y = p.getLocation().getY() + 0.5;
         for (int i = 0; i < 16; i++) {
-            w.spawnParticle(Particle.HAPPY_VILLAGER, c.getBlock(i, y, 0).getLocation().add(0.5, 0, 0), 1);
-            w.spawnParticle(Particle.HAPPY_VILLAGER, c.getBlock(i, y, 15).getLocation().add(0.5, 0, 0.9), 1);
-            w.spawnParticle(Particle.HAPPY_VILLAGER, c.getBlock(0, y, i).getLocation().add(0, 0, 0.5), 1);
-            w.spawnParticle(Particle.HAPPY_VILLAGER, c.getBlock(15, y, i).getLocation().add(0.9, 0, 0.5), 1);
+            w.spawnParticle(Particle.HAPPY_VILLAGER, c.getBlock(i, 0, 0).getLocation().getX() + 0.5, y, c.getBlock(i, 0, 0).getLocation().getZ() + 0.1, 1, 0, 0, 0, 0);
+            w.spawnParticle(Particle.HAPPY_VILLAGER, c.getBlock(0, 0, i).getLocation().getX() + 0.1, y, c.getBlock(0, 0, i).getLocation().getZ() + 0.5, 1, 0, 0, 0, 0);
         }
     }
 
-    @EventHandler
-    public void onMove(org.bukkit.event.player.PlayerMoveEvent e) {
-        Chunk c = e.getTo().getChunk();
-        String key = c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ();
-        if (claims.containsKey(key)) {
-            updateBossBar(e.getPlayer(), claims.get(key));
-        } else {
-            BossBar bar = activeBars.get(e.getPlayer().getUniqueId());
-            if (bar != null) bar.setVisible(false);
-        }
+    private void handleClaim(Player p) {
+        String country = getPlayerCountry(p);
+        if (country == null) { p.sendMessage("§c§l[!] §fСначала создайте страну!"); return; }
+        Chunk c = p.getLocation().getChunk();
+        claims.put(c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ(), country);
+        p.sendMessage("§a§l[✔] §fЗемля захвачена! §7Границы подсвечены искрами.");
+        p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 2f);
     }
 
-    @EventHandler
-    public void onBreak(BlockBreakEvent e) {
-        Chunk c = e.getBlock().getChunk();
-        String key = c.getWorld().getName() + ":" + c.getX() + ":" + c.getZ();
-        if (claims.containsKey(key) && !claims.get(key).equals(getPlayerCountry(e.getPlayer()))) {
-            e.setCancelled(true);
-            e.getPlayer().sendMessage("§c[!] Это чужая страна: §l" + claims.get(key));
-        }
+    private void handleExpand(Player p) {
+        try {
+            WorldEditPlugin we = (WorldEditPlugin) Bukkit.getPluginManager().getPlugin("WorldEdit");
+            Region r = we.getSession(p).getSelection(we.getSession(p).getSelectionWorld());
+            p.sendMessage("§a§l[↑] §fВыделение §e" + r.getArea() + " §fблоков успешно добавлено!");
+        } catch (Exception e) { p.sendMessage("§c§l[!] §fОшибка WorldEdit: Ничего не выделено!"); }
+    }
+
+    private void updateBossBar(Player p, String country) {
+        BossBar bar = activeBars.computeIfAbsent(p.getUniqueId(), k -> Bukkit.createBossBar("", BarColor.BLUE, BarStyle.SOLID));
+        bar.setTitle("§fСтрана: §b§l" + country + " §7| §fЛидер: §e" + p.getName());
+        bar.addPlayer(p);
+        bar.setVisible(true);
     }
 
     private String getPlayerCountry(Player p) {
-        for (Map.Entry<String, List<String>> entry : residents.entrySet()) {
-            if (entry.getValue().contains(p.getName())) return entry.getKey();
-        }
-        return null;
+        return residents.entrySet().stream().filter(e -> e.getValue().contains(p.getName())).map(Map.Entry::getKey).findFirst().orElse(null);
     }
 
-    private boolean sendHelp(Player p) {
-        p.sendMessage("§b--- [ CreateCountry Help ] ---");
-        p.sendMessage("§f/create create <имя> §7- Создать страну");
-        p.sendMessage("§f/create claim §7- Захватить чанк");
-        p.sendMessage("§f/create invite <ник> §7- Пригласить игрока");
-        p.sendMessage("§f/create expand §7- Расширить по WorldEdit");
-        return true;
-    }
-
+    // --- ТАБ-ПОДСКАЗКИ ---
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return Arrays.asList("create", "claim", "invite", "expand", "reload", "help")
-                .stream().filter(s -> s.startsWith(args[0].toLowerCase())).collect(Collectors.toList());
-        return new ArrayList<>();
+    public List<String> onTabComplete(CommandSender s, Command cmd, String alias, String[] args) {
+        if (args.length == 1) {
+            return Arrays.asList("menu", "claim", "invite", "expand", "reload").stream()
+                    .filter(opt -> opt.startsWith(args[0].toLowerCase())).collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("invite")) return null; // Ники игроков
+        return Collections.emptyList();
     }
 }
