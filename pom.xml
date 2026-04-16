@@ -24,20 +24,33 @@
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
         </repository>
+        <!-- Репозиторий для WorldEdit -->
+        <repository>
+            <id>enginehub</id>
+            <url>https://enginehub.org</url>
+        </repository>
     </repositories>
 
     <dependencies>
-        <!-- Для версии 1.21.8 мы ОБЯЗАНЫ использовать этот идентификатор API -->
+        <!-- Для версии 1.21.8 используем стабильный API 1.21.1 -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>1.21.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+        <!-- Vault API для экономики -->
         <dependency>
             <groupId>com.github.MilkBowl</groupId>
             <artifactId>VaultAPI</artifactId>
             <version>1.7.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- WorldEdit API для работы с выделениями -->
+        <dependency>
+            <groupId>com.sk89q.worldedit</groupId>
+            <artifactId>worldedit-bukkit</artifactId>
+            <version>7.3.0</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
