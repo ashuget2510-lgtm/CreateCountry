@@ -1,0 +1,32 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build with Maven
+      # Мы используем пакетную сборку. Если Maven не найдет 1.21.8 в репозитории, 
+      # он выдаст ошибку, и мы поймем, что версию в pom.xml нужно чуть подправить.
+      run: mvn -B package --file pom.xml
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CreateCountry-1.21.8
+        path: target/*.jar
