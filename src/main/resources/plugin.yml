@@ -4,4 +4,4 @@ main: me.states.CreateCountry
 api-version: "1.21"
 commands:
   create:
-    description: Создать страну на 1.21.8
+    description: Создать страну на 1.21
