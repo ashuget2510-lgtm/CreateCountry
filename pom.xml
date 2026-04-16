@@ -26,8 +26,8 @@
         </repository>
         <!-- Репозиторий для WorldEdit -->
         <repository>
-            <id>enginehub</id>
-            <url>https://enginehub.org</url>
+            <id>enginehub-repo</id>
+            <url>https://maven.enginehub.org/repo/</url>
         </repository>
     </repositories>
 
