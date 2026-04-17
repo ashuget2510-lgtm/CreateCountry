@@ -4,5 +4,4 @@ main: me.states.CreateCountry
 api-version: "1.21"
 commands:
   create:
-    description: Основная команда для управления странами
-    usage: /create <название|color|map|claim>
+    description: Управление странами
