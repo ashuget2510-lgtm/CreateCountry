@@ -15,7 +15,7 @@
 
     <repositories>
         <repository>
-            <id>papermc</id>
+            <id>papermc-snapshots</id>
             <url>https://papermc.io</url>
         </repository>
     </repositories>
