@@ -2,6 +2,8 @@ name: CreateCountry
 version: 1.6.5
 main: me.states.CreateCountry
 api-version: "1.21"
+depend: [Vault]
 commands:
   create:
-    description: Управление странами
+    description: Основная команда управления странами
+    aliases: [cc, country]
